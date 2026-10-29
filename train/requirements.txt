@@ -1,0 +1,16 @@
+# Python 3.10.20，CUDA 12.4（torch 自带 cu124 运行库）。
+# torch 需从 PyTorch 的 cu124 源安装：
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+torch==2.6.0+cu124
+nvidia-cublas-cu12==12.4.5.8
+nvidia-cudnn-cu12==9.1.0.70
+catboost==1.2.10
+xgboost==3.2.0
+cupy-cuda12x==14.2.0
+numpy==2.2.6
+pandas==2.3.3
+polars==1.41.2
+polars-runtime-32==1.41.2
+pyarrow==24.0.0
+scipy==1.15.3
+PyYAML==6.0.3

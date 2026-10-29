@@ -1,0 +1,122 @@
+# 训练配置。凡是会影响 inference/model/ 中产物的常数都写在这里。
+# 数据根目录不写在此处，由命令行 --data-0630 / --data-0823 传入。
+
+days: 768                 # 0630 训练 617 天 + 0823 回补 151 天
+day_len: 1440             # 1 天 = 1440 个 time_id
+n_assets: 15
+n_features: 323
+
+# ---------------------------------------------------------------- D1 网络
+d1:
+  # 标准化统计量只在 0630 训练集（前 617 天）上拟合，之后冻结。
+  scaler_days: 617
+  clip: 5.0
+  block_rows: 1000000      # 统计量按 100 万行分块累加（影响 float64 求和次序）
+
+  model:
+    seq_len: 16            # 回看窗 L
+    kernel_size: 5         # 因果移动平均核 k；合成滤波器长度 L+k-1 = 20
+    n_clock: 4             # 日内相位 sin/cos 一、二次谐波
+    emb_dim: 16
+    hidden: 128
+    dropout: 0.55          # 输入与隐层同为 0.55
+
+  train:
+    seeds: [20261201, 20261202, 20261203]
+    steps: 24000
+    lr: 0.00057155         # 1.4e-3 / sqrt(6)，保留 8 位小数
+    lr_min_ratio: 0.05     # cosine 退火终点 = lr * 0.05
+    weight_decay: 0.01     # 头与滤波器相同
+    grad_clip: 1.0
+    swa_start: 0.25        # 从 25% 步数起每 50 步累计一次
+    swa_every: 50
+    amp: true              # CUDA 上 bf16 autocast（不支持 bf16 时 fp16 + GradScaler）
+
+  # 伪标签重构器：target(t) ~ [f(t), ..., f(t+6)] + 资产哑变量 的岭回归
+  reconstructor:
+    days: 617              # 只在 0630 训练集上拟合
+    max_lag: 6
+    lam: 10.0
+    stride: 3              # 每 3 个 time_id 取 1 个
+    block_days: 4          # 正规方程按 4 天一块累加；末块越界整块丢弃
+
+  # 天末在线更新（推理期执行，此处只写入 d1_meta.json）。
+  # label_bound 不在此处：它等于由数据算出的 target_bound（见 d1/cache.py）。
+  online:
+    blend: 0.25
+    lr: 0.0005
+    beta1: 0.95
+    beta2: 0.97
+    eps: 1.0e-08
+    weight_decay: 0.0
+    grad_clip: 10.0
+    n_steps: 4
+    n_days: 7
+    day_decay: 1.0
+    anchor: 0.0
+    wema: 0.95
+    label_clip: 0.0
+  chunk_rows: 3000
+  buf_slack: 1440
+  budget_calls: 1300
+
+# ---------------------------------------------------------------- GBDT
+gbdt:
+  seeds: [42, 43, 44]
+  # 截面 / 时序派生特征共用的 40 根基特征（feature 编号）
+  top40: [15, 39, 36, 14, 219, 157, 34, 50, 151, 127, 13, 308, 93, 187, 287, 305,
+          47, 135, 286, 90, 148, 284, 188, 248, 42, 95, 228, 256, 129, 244, 281,
+          78, 144, 250, 76, 318, 258, 120, 96, 9]
+  roll_window: 60
+  roll_min: 10
+  # 派生块按此顺序排在 404 列基座之后，每块 40 列；最后接 clock3 的 6 列。
+  blocks: [xzs, xbeta128, xbeta512, xdmdev512]
+  unused_blocks: [xbeta128, xdmdev512]   # 两个模型都不使用；CatBoost 以 ignored_features 屏蔽
+
+  catboost:
+    rounds: 500
+    params:
+      learning_rate: 0.03
+      depth: 8
+      l2_leaf_reg: 100.0
+      bootstrap_type: Bernoulli
+      subsample: 0.8
+      random_strength: 1.0
+      border_count: 128
+      grow_policy: SymmetricTree
+    quantize:
+      border_count: 128
+      feature_border_type: GreedyLogSum
+      nan_mode: Min
+      random_seed: 42
+    # 多任务标签：[target, sqrt(aux_lambda) * std(target) * clip(z(responder_02), ±aux_clip)]
+    aux_responder: 2
+    aux_lambda: 8.0
+    aux_clip: 5.0
+
+  xgboost:
+    rounds: 320
+    chunk_rows: 250000     # QuantileDMatrix 分块构建的块大小
+    params:
+      objective: reg:squarederror
+      eval_metric: rmse
+      tree_method: hist
+      max_bin: 128
+      eta: 0.015
+      max_depth: 0
+      reg_lambda: 100.0
+      reg_alpha: 0.0
+      subsample: 0.8
+      sampling_method: uniform
+      colsample_bytree: 0.3
+      colsample_bylevel: 1.0
+      min_child_weight: 1.0
+      gamma: 0.0
+      grow_policy: lossguide
+      max_leaves: 512
+      nthread: 4
+
+# ---------------------------------------------------------------- 融合
+ensemble:
+  weights: {cat: 0.30, xgb: 0.30, host: 0.15, online: 0.25}
+  max_threads: 4

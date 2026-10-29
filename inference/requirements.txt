@@ -1,0 +1,5 @@
+# 本策略只依赖 numpy；pandas 由评测 runner 提供 test 表时使用。
+# 提交前请在官方 JupyterHub 的 base 环境里用
+#   python -m pip list --format=freeze > requirements.txt
+# 重新生成（conda 环境下 `pip freeze` 会产出 file:/// 路径，丢版本号）。
+numpy==2.2.6

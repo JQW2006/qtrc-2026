@@ -1,0 +1,61 @@
+site_name: 2026 量化交易研究大赛 · 策略报告
+site_description: 私榜第一名方案：GBDT + D1（冻结 / 在线）四路融合
+repo_url: https://github.com/JQW2006/qtrc-2026
+repo_name: JQW2006/qtrc-2026
+edit_uri: ""
+
+docs_dir: _pages_src  # 由 .github/pages/build.sh 从 report/ 组装
+site_dir: site
+
+nav:
+  - 总览: index.md
+  - time_id 周期: time_id.md
+  - 本地验证系统: valsys.md
+  - GBDT 模型族: gbdt.md
+  - MLP 模型族（D1）: mlp.md
+  - 工程实现: engineering.md
+  - 注意事项与 QA: notes_and_qa.md
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.footer
+    - toc.follow
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: 切换到深色
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到浅色
+
+markdown_extensions:
+  - tables
+  - attr_list
+  - md_in_html
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+plugins:
+  - search:
+      lang: zh
